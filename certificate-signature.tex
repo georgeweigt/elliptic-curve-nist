@@ -42,7 +42,7 @@ By necessity $s$ and $k$ are compatible.
 For example, if public key $k$ is RSA 2048 then signature $s$ is 2048 bits in length (256 bytes).
 See RFC 3447 Public-Key Cryptography Standards.
 
-A hash digest of $P$ is contained in $s$.
+A hash digest of $P$ is stored in signature $s$.
 For example, the following unencrypted signature $s$ is for RSA 2048 and hash digest SHA256.
 (Numerals are in hexadecimal.)
 
@@ -79,7 +79,7 @@ Signature $s$ (encrypted)
 \end{center}
 
 To prove that $P$ is signed by $Q$, $s$ is decrypted using $Q$'s public key $k$.
-Then if HASH matches digest $P$, the signing of $P$ by $Q$ is proven.
+Then if the HASH field matches digest $P$, the signing of $P$ by $Q$ is proven.
 
 Proving ``$P$ signed by $Q$'' proves that $s$ was encrypted using the private key associated with $k$.
 Only the owner of $Q$ knows the private key.

@@ -11,6 +11,10 @@ make
 ./demo
 ```
 
+For NIST P-256 (prime256v1) the signature length is 64 bytes.
+
+For NIST P-384 (secp384r1) the signature length is 96 bytes.
+
 #
 
 [Mathematical routines for the NIST prime elliptic curves](https://georgeweigt.github.io/nist-routines.pdf)
