@@ -14,6 +14,10 @@ ec256_encrypt(struct keyinfo *key, uint8_t *hash, int len, uint8_t *sig)
 	ec_free(d);
 }
 
+// h	bignum hash value
+// d	bignum secret key
+// sig	64 byte signature buffer
+
 void
 ec256_encrypt_nib(uint32_t *h, uint32_t *d, uint8_t *sig)
 {
@@ -98,7 +102,7 @@ ec256_encrypt_nib(uint32_t *h, uint32_t *d, uint8_t *sig)
 
 	n = ec_len(r); // number of uint32_t
 
-	if (n <= 8) {
+	if (n <= 8) { // no buffer overrun
 		for (i = 0; i < n; i++) {
 			sig[32 - 4 * i - 4] = r[i] >> 24;
 			sig[32 - 4 * i - 3] = r[i] >> 16;
@@ -109,7 +113,7 @@ ec256_encrypt_nib(uint32_t *h, uint32_t *d, uint8_t *sig)
 
 	n = ec_len(s); // number of uint32_t
 
-	if (n <= 8) {
+	if (n <= 8) { // no buffer overrun
 		for (i = 0; i < n; i++) {
 			sig[64 - 4 * i - 4] = s[i] >> 24;
 			sig[64 - 4 * i - 3] = s[i] >> 16;
