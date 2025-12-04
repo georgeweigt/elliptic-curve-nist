@@ -1,2 +1,2 @@
-ec: ec.c
-	$(CC) -Wall -O0 -o ec ec.c
+demo: *.c
+	$(CC) -Wall -O0 -o demo -include defs.h *.c

@@ -1,86 +1,7 @@
-/* Realization of "Mathematical routines for the NIST prime elliptic curves"
+int ec_malloc_count;
 
-BSD 2-Clause License
-
-Copyright (c) 2016, George Weigt
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-#include <stdio.h> // printf
-#include <stdlib.h> // abs, exit, free, malloc
-#include <string.h> // strlen
-#include <stdint.h>
-
-#define len(p) (p)[-1]
-
-int malloc_count;
-
-struct point {
-	uint32_t *x, *y, *z;
-};
-
-uint32_t * ec_modinv(uint32_t *c, uint32_t *p);
-void ec_projectify(struct point *S);
-void ec_affinify(struct point *S, uint32_t *p);
-void ec_double(struct point *R, struct point *S, uint32_t *p);
-void ec_add_xyz(struct point *R, struct point *S, struct point *T, uint32_t *p);
-void ec_full_add(struct point *R, struct point *S, struct point *T, uint32_t *p);
-void ec_full_sub(struct point *R, struct point *S, struct point *T, uint32_t *p);
-void ec_mult(struct point *R, uint32_t *d, struct point *S, uint32_t *p);
-int ec_get_msbit_index(uint32_t *u);
-int ec_get_bit(uint32_t *u, int k);
-int ec_F(int t);
-void ec_twin_mult(struct point *R, uint32_t *d0, struct point *S, uint32_t *d1, struct point *T, uint32_t *p);
-void ec_free_xyz(struct point *u);
-uint32_t * ec_add(uint32_t *u, uint32_t *v);
-uint32_t * ec_sub(uint32_t *u, uint32_t *v);
-uint32_t * ec_mul(uint32_t *u, uint32_t *v);
-uint32_t * ec_div(uint32_t *u, uint32_t *v);
-void ec_mod(uint32_t *u, uint32_t *v);
-uint32_t * ec_pow(uint32_t *u, uint32_t *v);
-void ec_shr(uint32_t *u);
-int ec_cmp(uint32_t *u, uint32_t *v);
-int ec_equal(uint32_t *u, uint32_t v);
-uint32_t * ec_int(int k);
-uint32_t * ec_new(int n);
-void ec_free(uint32_t *u);
-uint32_t * ec_dup(uint32_t *u);
-void ec_norm(uint32_t *u);
-uint32_t * ec_hexstr_to_bignum(char *s);
-void ec_test();
-void ec_test_full_add();
-void ec_test_full_sub();
-void ec_test_double();
-void ec_test_mult();
-void ec_test_twin_mult();
-
-int
-main()
-{
-	ec_test();
-	if (malloc_count)
-		printf("memory leak\n");
-}
+uint32_t *p256, *q256, *gx256, *gy256;
+uint32_t *p384, *q384, *gx384, *gy384;
 
 // returns 1/c mod p
 
@@ -154,15 +75,13 @@ ec_projectify(struct point *S)
 	S->z = ec_int(1);
 }
 
-void
+int
 ec_affinify(struct point *S, uint32_t *p)
 {
 	uint32_t *lambda, *lambda2, *lambda3, *x, *y;
 
-	if (ec_equal(S->z, 0)) {
-		printf("cannot affinify\n");
-		return;
-	}
+	if (ec_equal(S->z, 0))
+		return -1;
 
 	lambda = ec_modinv(S->z, p);
 
@@ -186,6 +105,8 @@ ec_affinify(struct point *S, uint32_t *p)
 	ec_free(lambda);
 	ec_free(lambda2);
 	ec_free(lambda3);
+
+	return 0;
 }
 
 void
@@ -731,7 +652,7 @@ ec_get_msbit_index(uint32_t *u)
 	int k, n;
 	uint32_t m;
 	m = 0x80000000;
-	n = len(u);
+	n = ec_len(u);
 	k = 32 * n - 1;
 	while (m > 1) {
 		if (u[n - 1] & m)
@@ -750,7 +671,7 @@ ec_get_bit(uint32_t *u, int k)
 	if (k < 0)
 		return 0;
 	j = k / 32;
-	if (j >= len(u))
+	if (j >= ec_len(u))
 		return 0;
 	m = 1 << (k % 32);
 	if (u[j] & m)
@@ -784,11 +705,6 @@ ec_twin_mult(struct point *R, uint32_t *d0, struct point *S, uint32_t *d1, struc
 {
 	int c[2][6], h[2], i, k, m, m0, m1, u[2];
 	struct point SpT, SmT;
-
-	if (R == S || R == T) {
-		printf("arg error\n");
-		return;
-	}
 
 	SpT.x = NULL;
 	SpT.y = NULL;
@@ -910,8 +826,8 @@ ec_add(uint32_t *u, uint32_t *v)
 	int i, nu, nv, nw;
 	uint64_t t;
 	uint32_t *w;
-	nu = len(u);
-	nv = len(v);
+	nu = ec_len(u);
+	nv = ec_len(v);
 	if (nu > nv)
 		nw = nu + 1;
 	else
@@ -944,8 +860,8 @@ ec_sub(uint32_t *u, uint32_t *v)
 	int i, nu, nv, nw;
 	uint64_t t;
 	uint32_t *w;
-	nu = len(u);
-	nv = len(v);
+	nu = ec_len(u);
+	nv = ec_len(v);
 	if (nu > nv)
 		nw = nu;
 	else
@@ -978,8 +894,8 @@ ec_mul(uint32_t *u, uint32_t *v)
 	int i, j, nu, nv, nw;
 	uint64_t t;
 	uint32_t *w;
-	nu = len(u);
-	nv = len(v);
+	nu = ec_len(u);
+	nv = ec_len(v);
 	nw = nu + nv;
 	w = ec_new(nw);
 	for (i = 0; i < nu; i++)
@@ -1007,10 +923,10 @@ ec_div(uint32_t *u, uint32_t *v)
 	uint64_t a, b, t;
 	ec_norm(u);
 	ec_norm(v);
-	if (len(v) == 1 && v[0] == 0)
+	if (ec_len(v) == 1 && v[0] == 0)
 		return NULL; // v = 0
-	nu = len(u);
-	nv = len(v);
+	nu = ec_len(u);
+	nv = ec_len(v);
 	k = nu - nv;
 	if (k < 0) {
 		q = ec_new(1);
@@ -1060,7 +976,7 @@ ec_div(uint32_t *u, uint32_t *v)
 			}
 			q[k] += qhat;
 			ec_norm(u);
-			nu = len(u);
+			nu = ec_len(u);
 		}
 	} while (--k >= 0);
 	ec_norm(q);
@@ -1079,10 +995,10 @@ ec_mod(uint32_t *u, uint32_t *v)
 	uint64_t a, b, t;
 	ec_norm(u);
 	ec_norm(v);
-	if (len(v) == 1 && v[0] == 0)
+	if (ec_len(v) == 1 && v[0] == 0)
 		return; // v = 0
-	nu = len(u);
-	nv = len(v);
+	nu = ec_len(u);
+	nv = ec_len(v);
 	k = nu - nv;
 	if (k < 0)
 		return; // u < v
@@ -1125,7 +1041,7 @@ ec_mod(uint32_t *u, uint32_t *v)
 				break;
 			}
 			ec_norm(u);
-			nu = len(u);
+			nu = ec_len(u);
 		}
 	} while (--k >= 0);
 	ec_free(w);
@@ -1152,7 +1068,7 @@ ec_pow(uint32_t *u, uint32_t *v)
 		// v = v >> 1
 		ec_shr(v);
 		// v = 0?
-		if (len(v) == 1 && v[0] == 0)
+		if (ec_len(v) == 1 && v[0] == 0)
 			break;
 		// u = u * u
 		t = ec_mul(u, u);
@@ -1170,7 +1086,7 @@ void
 ec_shr(uint32_t *u)
 {
 	int i;
-	for (i = 0; i < len(u) - 1; i++) {
+	for (i = 0; i < ec_len(u) - 1; i++) {
 		u[i] >>= 1;
 		if (u[i + 1] & 1)
 			u[i] |= 0x80000000;
@@ -1187,11 +1103,11 @@ ec_cmp(uint32_t *u, uint32_t *v)
 	int i;
 	ec_norm(u);
 	ec_norm(v);
-	if (len(u) < len(v))
+	if (ec_len(u) < ec_len(v))
 		return -1;
-	if (len(u) > len(v))
+	if (ec_len(u) > ec_len(v))
 		return 1;
-	for (i = len(u) - 1; i >= 0; i--) {
+	for (i = ec_len(u) - 1; i >= 0; i--) {
 		if (u[i] < v[i])
 			return -1;
 		if (u[i] > v[i])
@@ -1203,7 +1119,7 @@ ec_cmp(uint32_t *u, uint32_t *v)
 int
 ec_equal(uint32_t *u, uint32_t v)
 {
-	if (len(u) == 1 && u[0] == v)
+	if (ec_len(u) == 1 && u[0] == v)
 		return 1;
 	else
 		return 0;
@@ -1221,23 +1137,21 @@ ec_int(int k)
 uint32_t *
 ec_new(int n)
 {
-	uint32_t *u;
-	u = (uint32_t *) malloc((n + 1) * sizeof (uint32_t));
-	if (u == NULL) {
-		printf("malloc kaput\n");
-		exit(1);
-	}
-	malloc_count++;
-	u[0] = n;
-	return u + 1;
+	uint32_t *p;
+	p = (uint32_t *) malloc((n + 1) * sizeof (uint32_t));
+	if (p == NULL)
+		exit(1); // malloc kaput
+	*p = n;
+	ec_malloc_count++;
+	return p + 1;
 }
 
 void
-ec_free(uint32_t *u)
+ec_free(uint32_t *p)
 {
-	if (u) {
-		free(u - 1);
-		malloc_count--;
+	if (p) {
+		free(p - 1);
+		ec_malloc_count--;
 	}
 }
 
@@ -1246,8 +1160,8 @@ ec_dup(uint32_t *u)
 {
 	int i;
 	uint32_t *v;
-	v = ec_new(len(u));
-	for (i = 0; i < len(u); i++)
+	v = ec_new(ec_len(u));
+	for (i = 0; i < ec_len(u); i++)
 		v[i] = u[i];
 	return v;
 }
@@ -1257,8 +1171,8 @@ ec_dup(uint32_t *u)
 void
 ec_norm(uint32_t *u)
 {
-	while (len(u) > 1 && u[len(u) - 1] == 0)
-		len(u)--;
+	while (ec_len(u) > 1 && u[ec_len(u) - 1] == 0)
+		ec_len(u)--;
 }
 
 uint32_t *
@@ -1267,7 +1181,7 @@ ec_hexstr_to_bignum(char *s)
 	int d, i, len, n;
 	uint32_t *u;
 	len = strlen(s);
-	n = (len + 7) / 8; // convert len to number of uint32_t ints
+	n = (len + 7) / 8; // convert len to number of uint32_t
 	u = ec_new(n);
 	for (i = 0; i < n; i++)
 		u[i] = 0;
@@ -1289,357 +1203,67 @@ ec_hexstr_to_bignum(char *s)
 	return u;
 }
 
-void
-ec_test()
+uint32_t *
+ec_buf_to_bignum(uint8_t *buf, int len)
 {
-	ec_test_full_add();
-	ec_test_full_sub();
-	ec_test_double();
-	ec_test_mult();
-	ec_test_twin_mult();
+	int i, n, t;
+	uint32_t *u;
+	n = (len + 3) / 4;
+	u = ec_new(n);
+	t = 0;
+	for (i = 0; i < len; i++) {
+		t = t << 8 | buf[i];
+		if ((len - i - 1) % 4 == 0) {
+			u[--n] = t;
+			t = 0;
+		}
+	}
+	ec_norm(u);
+	return u;
 }
 
-void
-ec_test_full_add()
-{
-	uint32_t *p, *x, *y;
-	struct point R, S, T;
+static char *str_p256 =
+	"ffffffff00000001000000000000000000000000ffffffff"
+	"ffffffffffffffff";
 
-	char *str_p384 =
+static char *str_q256 =
+	"ffffffff00000000ffffffffffffffffbce6faada7179e84"
+	"f3b9cac2fc632551";
+
+static char *str_gx256 =
+	"6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0"
+	"f4a13945d898c296";
+
+static char *str_gy256 =
+	"4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ece"
+	"cbb6406837bf51f5";
+
+static char *str_p384 =
 	"ffffffffffffffffffffffffffffffffffffffffffffffff"
 	"fffffffffffffffeffffffff0000000000000000ffffffff";
 
-	char *str_xs =
-	"fba203b81bbd23f2b3be971cc23997e1ae4d89e69cb6f923"
-	"85dda82768ada415ebab4167459da98e62b1332d1e73cb0e";
+static char *str_q384 =
+	"ffffffffffffffffffffffffffffffffffffffffffffffff"
+	"c7634d81f4372ddf581a0db248b0a77aecec196accc52973";
 
-	char *str_ys =
-	"5ffedbaefdeba603e7923e06cdb5d0c65b22301429293376"
-	"d5c6944e3fa6259f162b4788de6987fd59aed5e4b5285e45";
+static char *str_gx384 =
+	"aa87ca22be8b05378eb1c71ef320ad746e1d3b628ba79b98"
+	"59f741e082542a385502f25dbf55296c3a545e3872760ab7";
 
-	char *str_xt =
-	"aacc05202e7fda6fc73d82f0a66220527da8117ee8f8330e"
-	"ad7d20ee6f255f582d8bd38c5a7f2b40bcdb68ba13d81051";
-
-	char *str_yt =
-	"84009a263fefba7c2c57cffa5db3634d286131afc0fca8d2"
-	"5afa22a7b5dce0d9470da89233cee178592f49b6fecb5092";
-
-	char *str_xr =
-	"12dc5ce7acdfc5844d939f40b4df012e68f865b89c3213ba"
-	"97090a247a2fc009075cf471cd2e85c489979b65ee0b5eed";
-
-	char *str_yr =
-	"167312e58fe0c0afa248f2854e3cddcb557f983b3189b67f"
-	"21eee01341e7e9fe67f6ee81b36988efa406945c8804a4b0";
-
-	p = ec_hexstr_to_bignum(str_p384);
-
-	S.x = ec_hexstr_to_bignum(str_xs);
-	S.y = ec_hexstr_to_bignum(str_ys);
-	S.z = ec_int(1);
-
-	T.x = ec_hexstr_to_bignum(str_xt);
-	T.y = ec_hexstr_to_bignum(str_yt);
-	T.z = ec_int(1);
-
-	R.x = NULL;
-	R.y = NULL;
-	R.z = NULL;
-
-	printf("Testing ec_full_add\n");
-
-	ec_full_add(&R, &S, &T, p);
-
-	ec_affinify(&R, p);
-
-	x = ec_hexstr_to_bignum(str_xr);
-	y = ec_hexstr_to_bignum(str_yr);
-
-	if (ec_cmp(R.x, x) == 0 && ec_cmp(R.y, y) == 0)
-		printf("pass\n");
-	else
-		printf("fail\n");
-
-	ec_free(p);
-	ec_free(x);
-	ec_free(y);
-
-	ec_free_xyz(&R);
-	ec_free_xyz(&S);
-	ec_free_xyz(&T);
-}
+static char *str_gy384 =
+	"3617de4a96262c6f5d9e98bf9292dc29f8f41dbd289a147c"
+	"e9da3113b5f0b8c00a60b1ce1d7e819d7a431d7c90ea0e5f";
 
 void
-ec_test_full_sub()
+ec_init()
 {
-	uint32_t *p, *x, *y;
-	struct point R, S, T;
-
-	char *str_p384 =
-	"ffffffffffffffffffffffffffffffffffffffffffffffff"
-	"fffffffffffffffeffffffff0000000000000000ffffffff";
-
-	char *str_xs =
-	"fba203b81bbd23f2b3be971cc23997e1ae4d89e69cb6f923"
-	"85dda82768ada415ebab4167459da98e62b1332d1e73cb0e";
-
-	char *str_ys =
-	"5ffedbaefdeba603e7923e06cdb5d0c65b22301429293376"
-	"d5c6944e3fa6259f162b4788de6987fd59aed5e4b5285e45";
-
-	char *str_xt =
-	"aacc05202e7fda6fc73d82f0a66220527da8117ee8f8330e"
-	"ad7d20ee6f255f582d8bd38c5a7f2b40bcdb68ba13d81051";
-
-	char *str_yt =
-	"84009a263fefba7c2c57cffa5db3634d286131afc0fca8d2"
-	"5afa22a7b5dce0d9470da89233cee178592f49b6fecb5092";
-
-	char *str_xr =
-	"6afdaf8da8b11c984cf177e551cee542cda4ac2f25cd522d"
-	"0cd710f88059c6565aef78f6b5ed6cc05a6666def2a2fb59";
-
-	char *str_yr =
-	"7bed0e158ae8cc70e847a60347ca1548c348decc6309f48b"
-	"59bd5afc9a9b804e7f7876178cb5a7eb4f6940a9c73e8e5e";
-
-	p = ec_hexstr_to_bignum(str_p384);
-
-	S.x = ec_hexstr_to_bignum(str_xs);
-	S.y = ec_hexstr_to_bignum(str_ys);
-	S.z = ec_int(1);
-
-	T.x = ec_hexstr_to_bignum(str_xt);
-	T.y = ec_hexstr_to_bignum(str_yt);
-	T.z = ec_int(1);
-
-	R.x = NULL;
-	R.y = NULL;
-	R.z = NULL;
-
-	printf("Testing ec_full_sub\n");
-
-	ec_full_sub(&R, &S, &T, p);
-
-	ec_affinify(&R, p);
-
-	x = ec_hexstr_to_bignum(str_xr);
-	y = ec_hexstr_to_bignum(str_yr);
-
-	if (ec_cmp(R.x, x) == 0 && ec_cmp(R.y, y) == 0)
-		printf("pass\n");
-	else
-		printf("fail\n");
-
-	ec_free(p);
-	ec_free(x);
-	ec_free(y);
-
-	ec_free_xyz(&R);
-	ec_free_xyz(&S);
-	ec_free_xyz(&T);
-}
-
-void
-ec_test_double()
-{
-	uint32_t *p, *x, *y;
-	struct point R, S;
-
-	char *str_p384 =
-	"ffffffffffffffffffffffffffffffffffffffffffffffff"
-	"fffffffffffffffeffffffff0000000000000000ffffffff";
-
-	char *str_xs =
-	"fba203b81bbd23f2b3be971cc23997e1ae4d89e69cb6f923"
-	"85dda82768ada415ebab4167459da98e62b1332d1e73cb0e";
-
-	char *str_ys =
-	"5ffedbaefdeba603e7923e06cdb5d0c65b22301429293376"
-	"d5c6944e3fa6259f162b4788de6987fd59aed5e4b5285e45";
-
-	char *str_xr =
-	"2a2111b1e0aa8b2fc5a1975516bc4d58017ff96b25e1bdff"
-	"3c229d5fac3bacc319dcbec29f9478f42dee597b4641504c";
-
-	char *str_yr =
-	"fa2e3d9dc84db8954ce8085ef28d7184fddfd1344b4d4797"
-	"343af9b5f9d837520b450f726443e4114bd4e5bdb2f65ddd";
-
-	p = ec_hexstr_to_bignum(str_p384);
-
-	S.x = ec_hexstr_to_bignum(str_xs);
-	S.y = ec_hexstr_to_bignum(str_ys);
-	S.z = ec_int(1);
-
-	R.x = NULL;
-	R.y = NULL;
-	R.z = NULL;
-
-	printf("Testing ec_double\n");
-
-	ec_double(&R, &S, p);
-
-	ec_affinify(&R, p);
-
-	x = ec_hexstr_to_bignum(str_xr);
-	y = ec_hexstr_to_bignum(str_yr);
-
-	if (ec_cmp(R.x, x) == 0 && ec_cmp(R.y, y) == 0)
-		printf("pass\n");
-	else
-		printf("fail\n");
-
-	ec_free(p);
-	ec_free(x);
-	ec_free(y);
-
-	ec_free_xyz(&R);
-	ec_free_xyz(&S);
-}
-
-void
-ec_test_mult()
-{
-	uint32_t *d, *p, *x, *y;
-	struct point R, S;
-
-	char *str_p384 =
-	"ffffffffffffffffffffffffffffffffffffffffffffffff"
-	"fffffffffffffffeffffffff0000000000000000ffffffff";
-
-	char *str_xs =
-	"fba203b81bbd23f2b3be971cc23997e1ae4d89e69cb6f923"
-	"85dda82768ada415ebab4167459da98e62b1332d1e73cb0e";
-
-	char *str_ys =
-	"5ffedbaefdeba603e7923e06cdb5d0c65b22301429293376"
-	"d5c6944e3fa6259f162b4788de6987fd59aed5e4b5285e45";
-
-	char *str_d =
-	"a4ebcae5a665983493ab3e626085a24c104311a761b5a8fd"
-	"ac052ed1f111a5c44f76f45659d2d111a61b5fdd97583480";
-
-	char *str_xr =
-	"e4f77e7ffeb7f0958910e3a680d677a477191df166160ff7"
-	"ef6bb5261f791aa7b45e3e653d151b95dad3d93ca0290ef2";
-
-	char *str_yr =
-	"ac7dee41d8c5f4a7d5836960a773cfc1376289d3373f8cf7"
-	"417b0c6207ac32e913856612fc9ff2e357eb2ee05cf9667f";
-
-	p = ec_hexstr_to_bignum(str_p384);
-
-	S.x = ec_hexstr_to_bignum(str_xs);
-	S.y = ec_hexstr_to_bignum(str_ys);
-	S.z = ec_int(1);
-
-	d = ec_hexstr_to_bignum(str_d);
-
-	R.x = NULL;
-	R.y = NULL;
-	R.z = NULL;
-
-	printf("Testing ec_mult\n");
-
-	ec_mult(&R, d, &S, p);
-
-	ec_affinify(&R, p);
-
-	x = ec_hexstr_to_bignum(str_xr);
-	y = ec_hexstr_to_bignum(str_yr);
-
-	if (ec_cmp(R.x, x) == 0 && ec_cmp(R.y, y) == 0)
-		printf("pass\n");
-	else
-		printf("fail\n");
-
-	ec_free(p);
-	ec_free(d);
-	ec_free(x);
-	ec_free(y);
-
-	ec_free_xyz(&R);
-	ec_free_xyz(&S);
-}
-
-void
-ec_test_twin_mult()
-{
-	uint32_t *d, *e, *p, *x, *y;
-	struct point R, S, T;
-
-	char *str_p384 =
-	"ffffffffffffffffffffffffffffffffffffffffffffffff"
-	"fffffffffffffffeffffffff0000000000000000ffffffff";
-
-	char *str_xs =
-	"fba203b81bbd23f2b3be971cc23997e1ae4d89e69cb6f923"
-	"85dda82768ada415ebab4167459da98e62b1332d1e73cb0e";
-
-	char *str_ys =
-	"5ffedbaefdeba603e7923e06cdb5d0c65b22301429293376"
-	"d5c6944e3fa6259f162b4788de6987fd59aed5e4b5285e45";
-
-	char *str_xt =
-	"aacc05202e7fda6fc73d82f0a66220527da8117ee8f8330e"
-	"ad7d20ee6f255f582d8bd38c5a7f2b40bcdb68ba13d81051";
-
-	char *str_yt =
-	"84009a263fefba7c2c57cffa5db3634d286131afc0fca8d2"
-	"5afa22a7b5dce0d9470da89233cee178592f49b6fecb5092";
-
-	char *str_d =
-	"a4ebcae5a665983493ab3e626085a24c104311a761b5a8fd"
-	"ac052ed1f111a5c44f76f45659d2d111a61b5fdd97583480";
-
-	char *str_e =
-	"afcf88119a3a76c87acbd6008e1349b29f4ba9aa0e12ce89"
-	"bcfcae2180b38d81ab8cf15095301a182afbc6893e75385d";
-
-	char *str_xr =
-	"917ea28bcd641741ae5d18c2f1bd917ba68d34f0f0577387"
-	"dc81260462aea60e2417b8bdc5d954fc729d211db23a02dc";
-
-	char *str_yr =
-	"1a29f7ce6d074654d77b40888c73e92546c8f16a5ff6bcbd"
-	"307f758d4aee684beff26f6742f597e2585c86da908f7186";
-
-	p = ec_hexstr_to_bignum(str_p384);
-
-	S.x = ec_hexstr_to_bignum(str_xs);
-	S.y = ec_hexstr_to_bignum(str_ys);
-	S.z = ec_int(1);
-
-	T.x = ec_hexstr_to_bignum(str_xt);
-	T.y = ec_hexstr_to_bignum(str_yt);
-	T.z = ec_int(1);
-
-	d = ec_hexstr_to_bignum(str_d);
-	e = ec_hexstr_to_bignum(str_e);
-
-	printf("Testing ec_twin_mult\n");
-
-	ec_twin_mult(&R, d, &S, e, &T, p);
-
-	ec_affinify(&R, p);
-
-	x = ec_hexstr_to_bignum(str_xr);
-	y = ec_hexstr_to_bignum(str_yr);
-
-	if (ec_cmp(R.x, x) == 0 && ec_cmp(R.y, y) == 0)
-		printf("pass\n");
-	else
-		printf("fail\n");
-
-	ec_free(p);
-	ec_free(d);
-	ec_free(e);
-	ec_free(x);
-	ec_free(y);
-
-	ec_free_xyz(&R);
-	ec_free_xyz(&S);
-	ec_free_xyz(&T);
+	p256 = ec_hexstr_to_bignum(str_p256);
+	q256 = ec_hexstr_to_bignum(str_q256);
+	gx256 = ec_hexstr_to_bignum(str_gx256);
+	gy256 = ec_hexstr_to_bignum(str_gy256);
+
+	p384 = ec_hexstr_to_bignum(str_p384);
+	q384 = ec_hexstr_to_bignum(str_q384);
+	gx384 = ec_hexstr_to_bignum(str_gx384);
+	gy384 = ec_hexstr_to_bignum(str_gy384);
 }
