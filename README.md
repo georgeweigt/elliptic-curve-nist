@@ -14,7 +14,7 @@ make
 NIST P-256 (prime256v1) encrypts 256 bits (32 bytes).
 The result is two 32 byte values R and S.
 
-NIST P-384 (secp384r1) encrypts a 384 bits (48 bytes).
+NIST P-384 (secp384r1) encrypts 384 bits (48 bytes).
 The result is two 48 byte values R and S.
 
 #
