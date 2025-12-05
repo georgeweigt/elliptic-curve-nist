@@ -42,8 +42,8 @@ Let $k'$ be the secret key associated with $k$.
 Only the owner of $Q$ knows the secret key.
 
 Signature $s$ is a hash digest of $P$ encrypted using secret key $k'$.
-For example, here is a 74 byte signature in ASN.1 notation for prime256v1
-and hash digest sha256.
+For example, here is a prime256v1 signature
+with the TLVs (tag, length, value) decoded.
 
 {\scriptsize
 \begin{verbatim}
@@ -57,11 +57,11 @@ and hash digest sha256.
 The two integers are the encryption result.
 The second integer is 33 bytes because of the ASN.1 coding rule that the first bit
 of an integer must be 0.
-Note the ASN.1 object hierarchy of ``sequence'' encompassing the two integers
-and ``bit string'' encompassing the ``sequence'' object.
+The TLVs are nested such that the two integers are the value of ``sequence''
+and ``sequence'' is the value of ``bit string.''
 
 To prove that $P$ is signed by $Q$, signature $s$ is decrypted using $Q$'s public key $k$.
-Then if the decrypted value matches the digest of $P$ (sha256 in this example),
+Then if the decrypted value matches the digest of $P$,
 the signing of $P$ by $Q$ is proven.
 The contents of $P$ cannot be changed without breaking signature $s$,
 and $s$ cannot be changed without knowing the secret key $k'$.
