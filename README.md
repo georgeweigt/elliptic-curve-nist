@@ -11,9 +11,11 @@ make
 ./demo
 ```
 
-For NIST P-256 (prime256v1) the signature length is 64 bytes.
+NIST P-256 (prime256v1) encrypts a 32 byte value.
+The result is two 32 byte values.
 
-For NIST P-384 (secp384r1) the signature length is 96 bytes.
+NIST P-384 (secp384r1) encrypts a 48 byte value.
+The result is two 48 byte values.
 
 #
 
